@@ -158,10 +158,11 @@ available_datasets = {
 }
 
 if app_mode == "Individual Fight Analysis":
-    st.markdown("Analyze round-by-round boxing match statistics to understand fight dynamics.")
+    # Simplified markdown for debugging
+    st.markdown("📊 Analyze round-by-round boxing match statistics. 🥊 Dive into the numbers! 🔢") 
     dataset_options = list(available_datasets.keys())
     selected_dataset_key = st.sidebar.selectbox(
-        "Select Data Source",
+        "Fights Data 📊",
         options=dataset_options,
         index=0 
     )
@@ -257,95 +258,94 @@ if app_mode == "Individual Fight Analysis":
                     st.metric(label=f"{boxer_a} Sig. Accuracy %", value=f"{stats_a['sig_punch_accuracy_pct']}%" )
                     st.metric(label=f"{boxer_b} Sig. Accuracy %", value=f"{stats_b['sig_punch_accuracy_pct']}%", delta=f"{round(stats_b['sig_punch_accuracy_pct'] - stats_a['sig_punch_accuracy_pct'], 1)}%")
                 with col4:
-                    st.metric(label=f"{boxer_a} Avg. Ring Control", value=f"{stats_a['avg_ring_control']:.1f}%" if stats_a['avg_ring_control'] else "N/A")
-                    st.metric(label=f"{boxer_b} Avg. Ring Control", value=f"{stats_b['avg_ring_control']:.1f}%" if stats_b['avg_ring_control'] else "N/A")
+                    st.metric(label=f"{boxer_a} Head Landed", value=int(stats_a["total_head_punches_landed"]))
+                    st.metric(label=f"{boxer_b} Head Landed", value=int(stats_b["total_head_punches_landed"]), delta=f"{int(stats_b['total_head_punches_landed'] - stats_a['total_head_punches_landed'])}")
                 
-                st.subheader("Detailed Aggregate Table")
+                st.subheader("Detailed Aggregate Stats Table")
                 st.dataframe(df_agg_display.set_index("Boxer"))
 
-                st.subheader("Predicted Winner (Based on Significant Punches Landed)")
-                if stats_a["total_sig_punches_landed"] > stats_b["total_sig_punches_landed"]:
-                    st.success(f"🏆 Predicted Winner: **{boxer_a}**")
-                elif stats_b["total_sig_punches_landed"] > stats_a["total_sig_punches_landed"]:
-                    st.success(f"🏆 Predicted Winner: **{boxer_b}**")
+                winner = stats_a["Boxer"] if stats_a["total_sig_punches_landed"] > stats_b["total_sig_punches_landed"] else stats_b["Boxer"]
+                loser = stats_b["Boxer"] if stats_a["total_sig_punches_landed"] > stats_b["total_sig_punches_landed"] else stats_a["Boxer"]
+                if stats_a["total_sig_punches_landed"] == stats_b["total_sig_punches_landed"]:
+                    st.info("The match is a draw based on significant punches landed.")
                 else:
-                    st.info("⚖️ Prediction: **Draw** (Based on equal significant punches landed)")
+                    st.success(f"🏆 Based on Significant Punches Landed, the likely winner is: **{winner}** over **{loser}**.")
             else:
-                st.warning("Could not calculate aggregate statistics. Ensure both selected boxers have data.")
-        elif boxer_a and not boxer_b:
-            st.info(f"Displaying data for {boxer_a} as no second boxer was selected or available.")
-            # Display single boxer data if needed here
+                st.warning("Could not calculate overall match statistics. Ensure both boxers are selected and data is available.")
         else:
-            st.error("Please select valid boxers from the sidebar to start the analysis.")
+            st.info("Select two boxers from the sidebar to view detailed analysis.")
     else:
-        st.error("Failed to load the selected dataset. Please check the file or try another dataset.")
+        st.warning("Please select a valid data source to begin analysis.")
 
 elif app_mode == "Fight Comparison":
-    st.header("Compare Multiple Fights")
-    st.markdown("Select different metrics to compare across all loaded boxing matches.")
-
-    all_fight_data = []
-    fight_names = []
-
+    st.markdown("Compare statistics across different boxing matches.")
+    
+    all_fight_data = {}
     for fight_name, file_path in available_datasets.items():
         df_fight = load_data(file_path)
         if df_fight is not None:
-            # Calculate aggregates for each boxer in the fight
             boxers_in_fight = df_fight["Boxer"].unique()
-            if len(boxers_in_fight) >= 1: # Can be 1 if only one boxer's data is in a file
-                # For simplicity in comparison, we sum stats for both boxers to get a "fight total"
-                # or average where appropriate. This is a simplification for cross-fight comparison.
-                fight_total_thrown = df_fight["Punches Thrown"].sum()
-                fight_total_landed = df_fight["Punches Landed"].sum()
-                fight_sig_total_thrown = df_fight["Significant Punches Thrown"].sum()
-                fight_sig_total_landed = df_fight["Significant Punches Landed"].sum()
-                
-                fight_accuracy = (fight_total_landed * 100 / fight_total_thrown) if fight_total_thrown > 0 else 0
-                fight_sig_accuracy = (fight_sig_total_landed * 100 / fight_sig_total_thrown) if fight_sig_total_thrown > 0 else 0
-                
-                all_fight_data.append({
-                    "Fight Name": fight_name,
-                    "Total Punches Thrown": fight_total_thrown,
-                    "Total Punches Landed": fight_total_landed,
-                    "Total Significant Punches Thrown": fight_sig_total_thrown,
-                    "Total Significant Punches Landed": fight_sig_total_landed,
-                    "Overall Punch Accuracy (%)": round(fight_accuracy, 1),
-                    "Overall Significant Punch Accuracy (%)": round(fight_sig_accuracy, 1)
-                })
-                fight_names.append(fight_name)
+            if len(boxers_in_fight) >= 2:
+                 # Attempt to get the primary two boxers, handling cases with more than 2 if necessary
+                boxer1_name = boxers_in_fight[0]
+                boxer2_name = boxers_in_fight[1]
+                stats1, stats2, _ = calculate_match_aggregates(df_fight, boxer1_name, boxer2_name)
+                if stats1 is not None and stats2 is not None:
+                    all_fight_data[fight_name] = {
+                        f"{boxer1_name} (Total Thrown)": stats1["total_punches_thrown"],
+                        f"{boxer1_name} (Total Landed)": stats1["total_punches_landed"],
+                        f"{boxer1_name} (Sig. Thrown)": stats1["total_sig_punches_thrown"],
+                        f"{boxer1_name} (Sig. Landed)": stats1["total_sig_punches_landed"],
+                        f"{boxer1_name} (Accuracy %)": stats1["punch_accuracy_pct"],
+                        f"{boxer1_name} (Sig. Accuracy %)": stats1["sig_punch_accuracy_pct"],
+                        f"{boxer2_name} (Total Thrown)": stats2["total_punches_thrown"],
+                        f"{boxer2_name} (Total Landed)": stats2["total_punches_landed"],
+                        f"{boxer2_name} (Sig. Thrown)": stats2["total_sig_punches_thrown"],
+                        f"{boxer2_name} (Sig. Landed)": stats2["total_sig_punches_landed"],
+                        f"{boxer2_name} (Accuracy %)": stats2["punch_accuracy_pct"],
+                        f"{boxer2_name} (Sig. Accuracy %)": stats2["sig_punch_accuracy_pct"],
+                        "Combined Total Punches Thrown": stats1["total_punches_thrown"] + stats2["total_punches_thrown"],
+                        "Combined Total Punches Landed": stats1["total_punches_landed"] + stats2["total_punches_landed"],
+                        "Combined Sig. Punches Thrown": stats1["total_sig_punches_thrown"] + stats2["total_sig_punches_thrown"],
+                        "Combined Sig. Punches Landed": stats1["total_sig_punches_landed"] + stats2["total_sig_punches_landed"],
+                        "Overall Punch Accuracy %": round(((stats1["total_punches_landed"] + stats2["total_punches_landed"]) * 100) / 
+                                                        (stats1["total_punches_thrown"] + stats2["total_punches_thrown"] if (stats1["total_punches_thrown"] + stats2["total_punches_thrown"]) > 0 else 1), 1),
+                        "Overall Sig. Punch Accuracy %": round(((stats1["total_sig_punches_landed"] + stats2["total_sig_punches_landed"]) * 100) / 
+                                                             (stats1["total_sig_punches_thrown"] + stats2["total_sig_punches_thrown"] if (stats1["total_sig_punches_thrown"] + stats2["total_sig_punches_thrown"]) > 0 else 1), 1)
+                    }
     
     if not all_fight_data:
-        st.warning("No fight data could be loaded for comparison. Please check your CSV files.")
+        st.warning("No fight data available for comparison or data is not in the expected format.")
     else:
-        df_comparison = pd.DataFrame(all_fight_data)
-        df_comparison = df_comparison.set_index("Fight Name")
-
+        comparison_df = pd.DataFrame.from_dict(all_fight_data, orient="index")
+        
+        st.sidebar.header("Comparison Metric")
         comparison_metrics = [
-            "Total Punches Thrown", 
-            "Total Punches Landed", 
-            "Total Significant Punches Thrown", 
-            "Total Significant Punches Landed",
-            "Overall Punch Accuracy (%)",
-            "Overall Significant Punch Accuracy (%)"
+            "Combined Total Punches Thrown", 
+            "Combined Total Punches Landed",
+            "Combined Sig. Punches Thrown",
+            "Combined Sig. Punches Landed",
+            "Overall Punch Accuracy %",
+            "Overall Sig. Punch Accuracy %"
         ]
-        selected_metric = st.selectbox("Select Metric for Comparison", options=comparison_metrics)
+        selected_metric = st.sidebar.selectbox("Select Metric to Compare", comparison_metrics)
 
-        if selected_metric:
-            st.subheader(f"Comparison by: {selected_metric}")
-            
-            # Sort by selected metric for better visualization
-            df_sorted_comparison = df_comparison.sort_values(by=selected_metric, ascending=False)
-            
-            st.dataframe(df_sorted_comparison[[selected_metric]])
+        st.subheader(f"Fight Comparison by: {selected_metric}")
+        
+        # Sort by selected metric for better visualization
+        sorted_comparison_df = comparison_df.sort_values(by=selected_metric, ascending=False)
+        
+        st.dataframe(sorted_comparison_df)
 
-            fig_comp = px.bar(df_sorted_comparison, y=selected_metric, x=df_sorted_comparison.index, 
-                                title=f"Fight Comparison: {selected_metric}",
-                                labels={selected_metric: selected_metric, "index": "Fight"},
-                                color=selected_metric,
-                                color_continuous_scale=px.colors.sequential.Viridis)
-            fig_comp.update_layout(xaxis_title="Fight", yaxis_title=selected_metric)
-            st.plotly_chart(fig_comp, use_container_width=True)
+        fig_comp = px.bar(sorted_comparison_df, 
+                            x=sorted_comparison_df.index, 
+                            y=selected_metric, 
+                            color=selected_metric,
+                            labels={selected_metric: selected_metric, "index": "Fight"},
+                            title=f"Comparison of Fights by {selected_metric}")
+        fig_comp.update_layout(xaxis_title="Fight", yaxis_title=selected_metric)
+        st.plotly_chart(fig_comp, use_container_width=True)
 
 st.sidebar.markdown("--- Central")
-st.sidebar.markdown("Created by Karl Siaka with Manus AI")
+st.sidebar.info("Created by Karl Siaka with Manus AI")
 
