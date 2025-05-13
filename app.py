@@ -15,9 +15,9 @@ st.set_page_config(
 
 # --- Personal Information Header ---
 with st.container():
-    img_col, text_col = st.columns([1, 4]) 
+    img_col, text_col = st.columns([2, 6]) 
     with img_col:
-        st.image("https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y&s=150", width=100, caption="Karl Siaka") 
+        st.image("Karl.jpeg", width=200, caption="Karl Siaka") 
     with text_col:
         st.markdown("### Built with love by Karl Siaka")
         st.markdown("**Email:** siakatayoukarlwilliam@gmail.com")
